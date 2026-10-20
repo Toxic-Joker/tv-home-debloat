@@ -1,0 +1,13 @@
+01.jpg|Lake Louise, Canada
+02.jpg|Blue Lake, Mount Cook National Park, New Zealand
+03.jpg|Breiðamerkurjökull Glacier, Iceland
+04.jpg|Tennfjorden, Hinnøya, Norway
+05.jpg|Mount Shasta, California
+06.jpg|Gorges du Tarn, France
+07.jpg|Vallée de Gavarnie, Pyrenees, France
+08.jpg|Dzükou Valley, India
+09.jpg|Lake Titicaca at dawn, Peru
+10.jpg|Almsee, Austria
+11.jpg|Gullmarsskogen, Sweden
+12.jpg|Robson Valley, Canada
+13.jpg|Swaledale, England

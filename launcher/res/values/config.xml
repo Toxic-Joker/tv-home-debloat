@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TV Home</string>
+    <string name="dream_name">Nature Slideshow</string>
+    <string name="key_service_name">TV Home quick panel</string>
+    <string name="key_service_desc">Hold the Home button to open the TV Home quick settings panel.</string>
+
+    <!-- Default dock, left to right. Edit here, then run build-and-install.sh.
+         On the TV you can also long-press OK on any app to add/move/remove it. -->
+    <string-array name="default_dock">
+        <item>org.smarttube.stable</item>
+        <item>com.sportzx.live</item>
+        <item>com.miruronative</item>
+        <item>com.apple.atve.androidtv.appletv</item>
+    </string-array>
+
+    <!-- Minutes between wallpaper crossfades on the home screen -->
+    <integer name="wallpaper_minutes">10</integer>
+
+    <style name="HomeTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowShowWallpaper">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:colorAccent">#FFFFFFFF</item>
+    </style>
+
+    <style name="PanelTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>

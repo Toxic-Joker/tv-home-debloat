@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="wp_front" type="id" />
+    <item name="wp_back" type="id" />
+    <item name="caption" type="id" />
+</resources>

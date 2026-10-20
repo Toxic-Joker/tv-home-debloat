@@ -1,0 +1,12 @@
+# Local device address and device-specific backups (contain serials, settings, network info)
+.tv
+backup/
+screenshots/
+# Downloaded tooling and signing key
+tools/platform-tools/
+tools/sdk/
+tools/*.keystore
+# Build output
+launcher/build/
+*.apk
+*.idsig
