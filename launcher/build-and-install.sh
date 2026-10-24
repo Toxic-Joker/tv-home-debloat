@@ -32,5 +32,13 @@ ls -lh tv-home.apk
 
 if [ "${1:-}" != "--no-install" ]; then
   $ADB connect $TV >/dev/null
+  SVC=com.tvhome.launcher/com.tvhome.launcher.HomeKeyService
+  before=$($ADB -s $TV shell settings get secure enabled_accessibility_services | tr -d '\r')
   $ADB -s $TV install -r tv-home.apk
+  # Some firmwares drop an updated app's accessibility service; put it back if it was on
+  case "$before" in *"$SVC"*)
+    now=$($ADB -s $TV shell settings get secure enabled_accessibility_services | tr -d '\r')
+    case "$now" in *"$SVC"*) ;; *) $ADB -s $TV shell settings put secure enabled_accessibility_services "$before"
+                                   echo "Re-enabled TV Home's accessibility service" ;; esac ;;
+  esac
 fi

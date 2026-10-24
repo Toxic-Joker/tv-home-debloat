@@ -43,6 +43,7 @@ import java.util.concurrent.Executors;
 /** Minimal Apple TV-style home: clock, rotating nature wallpaper, app dock, all-apps grid. */
 public class HomeActivity extends Activity {
     private static final int GRID_COLUMNS = 5;
+    static final String EXTRA_ALL_APPS = "all_apps";
     private static final float TILE_W = 160, TILE_H = 90, RADIUS = 14;
 
     static final class App {
@@ -54,6 +55,10 @@ public class HomeActivity extends Activity {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<String, App> apps = new LinkedHashMap<>();
     private SharedPreferences prefs;
+    private final SharedPreferences.OnSharedPreferenceChangeListener dockChanged = (p, key) -> {
+        if ("dock".equals(key)) renderApps();
+        if ("hidden".equals(key)) loadApps();
+    };
     private WallpaperRotator rotator;
 
     private ScrollView scroller;
@@ -63,6 +68,7 @@ public class HomeActivity extends Activity {
     private View gridShade;
     private int lastDockIndex;
     private boolean firstRender = true;
+    private boolean wantAllApps; // opened by the remote's apps button before the grid was built
 
     private final BroadcastReceiver packagesChanged = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) { loadApps(); }
@@ -78,6 +84,7 @@ public class HomeActivity extends Activity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         prefs = getSharedPreferences("home", MODE_PRIVATE);
+        prefs.registerOnSharedPreferenceChangeListener(dockChanged);
         buildUi();
         rotator = new WallpaperRotator(this, (ImageView) findViewById(R.id.wp_front),
                 (ImageView) findViewById(R.id.wp_back), (TextView) findViewById(R.id.caption),
@@ -90,10 +97,12 @@ public class HomeActivity extends Activity {
         f.addDataScheme("package");
         registerReceiver(packagesChanged, f);
         loadApps();
+        wantAllApps = getIntent().getBooleanExtra(EXTRA_ALL_APPS, false);
     }
 
     @Override protected void onDestroy() {
         unregisterReceiver(packagesChanged);
+        prefs.unregisterOnSharedPreferenceChangeListener(dockChanged);
         super.onDestroy();
     }
 
@@ -117,7 +126,17 @@ public class HomeActivity extends Activity {
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        backToDock(); // Home pressed while already home
+        if (intent.getBooleanExtra(EXTRA_ALL_APPS, false)) showAllApps();
+        else backToDock(); // Home pressed while already home
+    }
+
+    /** Remote "apps" button (HomeKeyService target "allapps"): jump straight to the grid. */
+    private void showAllApps() {
+        main.postDelayed(() -> {
+            if (grid.getChildCount() == 0) return;
+            grid.getChildAt(0).requestFocus();
+            scroller.smoothScrollTo(0, allTitle.getTop() - Ui.dp(this, 24));
+        }, 150);
     }
 
     @Override public void onBackPressed() {
@@ -189,7 +208,7 @@ public class HomeActivity extends Activity {
         clp.setMargins(Ui.dp(this, 56), Ui.dp(this, 40), 0, 0);
         hero.addView(clockBox, clp);
 
-        TextView settings = pill("⚙  Settings");
+        TextView settings = pill(getString(R.string.settings_pill));
         settings.setOnClickListener(v -> launch(new Intent(Settings.ACTION_SETTINGS)));
         FrameLayout.LayoutParams slp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
         slp.setMargins(0, Ui.dp(this, 44), Ui.dp(this, 56), 0);
@@ -227,7 +246,7 @@ public class HomeActivity extends Activity {
 
         // All apps
         allTitle = new TextView(this);
-        allTitle.setText("All apps");
+        allTitle.setText(getString(R.string.all_apps));
         Ui.style(allTitle, 20, 0.9f, false);
         LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(-2, -2);
         alp.setMargins(Ui.dp(this, 64), Ui.dp(this, 8), 0, Ui.dp(this, 12));
@@ -271,7 +290,7 @@ public class HomeActivity extends Activity {
 
     private void updateGreeting() {
         int h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
-        greeting.setText(h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening");
+        greeting.setText(h < 5 ? getString(R.string.good_night) : h < 12 ? getString(R.string.good_morning) : h < 18 ? getString(R.string.good_afternoon) : getString(R.string.good_evening));
     }
 
     /** Entering the grid from the dock: bring the whole "All apps" section into view. */
@@ -292,11 +311,13 @@ public class HomeActivity extends Activity {
         io.execute(() -> {
             PackageManager pm = getPackageManager();
             Map<String, App> found = new LinkedHashMap<>();
+            List<String> hidden = Arrays.asList(TextUtils.split(prefs.getString("hidden", ""), ","));
             for (String cat : new String[] { Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER }) {
                 Intent q = new Intent(Intent.ACTION_MAIN).addCategory(cat);
                 for (ResolveInfo ri : pm.queryIntentActivities(q, 0)) {
                     ActivityInfo ai = ri.activityInfo;
-                    if (ai.packageName.equals(getPackageName()) || found.containsKey(ai.packageName)) continue;
+                    if (ai.packageName.equals(getPackageName()) || found.containsKey(ai.packageName)
+                            || hidden.contains(ai.packageName)) continue;
                     App a = new App();
                     a.pkg = ai.packageName;
                     a.label = String.valueOf(ri.loadLabel(pm));
@@ -329,13 +350,13 @@ public class HomeActivity extends Activity {
     }
 
     private void saveDock(List<String> list) {
-        prefs.edit().putString("dock", TextUtils.join(",", list)).putString("dock_defaults", defaultDock()).apply();
-        renderApps();
+        prefs.edit().putString("dock", TextUtils.join(",", list)).putString("dock_defaults", defaultDock()).apply(); // dockChanged re-renders
     }
 
     private void renderApps() {
         View cur = getCurrentFocus();
-        boolean hadFocus = firstRender || dockRow.hasFocus() || cur == null || cur == scroller;
+        // An empty dock (e.g. before this TV's dock was configured) never got focus, so claim it now
+        boolean hadFocus = firstRender || dockRow.getChildCount() == 0 || dockRow.hasFocus() || cur == null || cur == scroller;
         firstRender = false;
         dockRow.removeAllViews();
         int gap = Ui.dp(this, 18);
@@ -361,7 +382,8 @@ public class HomeActivity extends Activity {
             lp.setMargins(g, g, g, g);
             grid.addView(t, lp);
         }
-        if (hadFocus) main.post(this::backToDock);
+        if (wantAllApps) { wantAllApps = false; showAllApps(); }
+        else if (hadFocus) main.post(this::backToDock);
     }
 
     private View tile(final App a, final Runnable onFocus) {
@@ -429,13 +451,13 @@ public class HomeActivity extends Activity {
         final List<String> labels = new ArrayList<>();
         final List<Runnable> actions = new ArrayList<>();
         if (pos >= 0) {
-            if (pos > 0) { labels.add("Move left"); actions.add(() -> { Collections.swap(d, pos, pos - 1); lastDockIndex = pos - 1; saveDock(d); }); }
-            if (pos < d.size() - 1) { labels.add("Move right"); actions.add(() -> { Collections.swap(d, pos, pos + 1); lastDockIndex = pos + 1; saveDock(d); }); }
-            labels.add("Remove from dock"); actions.add(() -> { d.remove(pos); saveDock(d); });
+            if (pos > 0) { labels.add(getString(R.string.move_left)); actions.add(() -> { Collections.swap(d, pos, pos - 1); lastDockIndex = pos - 1; saveDock(d); }); }
+            if (pos < d.size() - 1) { labels.add(getString(R.string.move_right)); actions.add(() -> { Collections.swap(d, pos, pos + 1); lastDockIndex = pos + 1; saveDock(d); }); }
+            labels.add(getString(R.string.remove_dock)); actions.add(() -> { d.remove(pos); saveDock(d); });
         } else {
-            labels.add("Add to dock"); actions.add(() -> { d.add(a.pkg); lastDockIndex = d.size() - 1; saveDock(d); });
+            labels.add(getString(R.string.add_dock)); actions.add(() -> { d.add(a.pkg); lastDockIndex = d.size() - 1; saveDock(d); });
         }
-        labels.add("App info");
+        labels.add(getString(R.string.app_info));
         actions.add(() -> launch(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                 Uri.fromParts("package", a.pkg, null))));
         new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)

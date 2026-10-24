@@ -2,20 +2,15 @@
 # Undo everything debloat.sh / set-launcher.sh did, using the backup taken beforehand.
 #   ./restore.sh                     re-enable apps, restore settings + Google TV launcher
 #   ./restore.sh --remove-launcher   ...and also uninstall the TV Home launcher
-#   BACKUP=backup/<timestamp> ./restore.sh   use a specific backup snapshot
+#   BACKUP=backup/<device>/<timestamp> ./restore.sh   use a specific backup snapshot
 set -u
-cd "$(dirname "$0")"
-TV="${TV:-$(cat .tv 2>/dev/null)}"; [ -n "$TV" ] || { echo "Set TV=<ip>:5555 or write it to .tv"; exit 1; }
-ADB="tools/platform-tools/adb"; command -v adb >/dev/null && [ ! -x "$ADB" ] && ADB=adb
-A="$ADB -s $TV"
-B="${BACKUP:-$(cat backup/LATEST)}"
-[ -d "$B" ] || { echo "Backup folder $B not found"; exit 1; }
-$ADB connect "$TV" >/dev/null
-$A get-state >/dev/null || { echo "TV not reachable at $TV"; exit 1; }
+. "$(dirname "$0")/lib.sh"
+B="${BACKUP:-$(cat "$BDIR/LATEST" 2>/dev/null)}"
+[ -d "$B" ] || { echo "No backup found for $DEVICE ($BDIR)"; exit 1; }
 echo "Restoring from $B"
 
 # 1) Re-enable every package we disabled (log), plus anything enabled in the snapshot but disabled now
-want=$( { cat backup/debloat-applied.txt 2>/dev/null; sed 's/^package://' "$B/packages-enabled.txt"; } | sort -u)
+want=$( { cat "$LOG" 2>/dev/null; sed 's/^package://' "$B/packages-enabled.txt"; } | sort -u)
 now_disabled=$($A shell pm list packages -d | sed 's/^package://' | tr -d '\r' | sort -u)
 for p in $(comm -12 <(echo "$want") <(echo "$now_disabled")); do
   echo "enable $p: $($A shell pm enable --user 0 "$p" 2>&1 | tr -d '\r')"
@@ -35,5 +30,5 @@ orig=$(tail -1 "$B/home-launcher.txt" | tr -d '\r')
 $A shell cmd package set-home-activity --user 0 "$orig"
 if [ "${1:-}" = "--remove-launcher" ]; then $A uninstall com.tvhome.launcher; fi
 $A shell input keyevent KEYCODE_HOME
-: > backup/debloat-applied.txt
+: > "$LOG"
 echo "Restore complete. Disabled now: $($A shell pm list packages -d | wc -l) packages."

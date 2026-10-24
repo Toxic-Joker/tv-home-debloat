@@ -62,23 +62,29 @@ public class QuickPanelActivity extends Activity {
         Ui.noClip(grid);
         panel.addView(grid);
 
-        View first = add(grid, R.drawable.ic_wifi, "Network", networkStatus(),
+        View first = add(grid, R.drawable.ic_wifi, getString(R.string.network), networkStatus(),
                 () -> open(new Intent(Settings.ACTION_WIFI_SETTINGS)));
-        add(grid, R.drawable.ic_display, "Display & sound", null,
-                () -> open(new Intent("android.settings.SOUND_SETTINGS")));
-        add(grid, R.drawable.ic_storage, "Storage", storageStatus(),
+        // Explicit screen: on some TVs several activities claim SOUND_SETTINGS and a chooser pops up
+        add(grid, R.drawable.ic_display, getString(R.string.display_sound), null,
+                () -> open(new Intent().setClassName("com.android.tv.settings",
+                        "com.android.tv.settings.device.displaysound.DisplaySoundActivity")));
+        final Intent picture = new Intent(Settings.ACTION_DISPLAY_SETTINGS);
+        if (picture.resolveActivity(getPackageManager()) != null) { // TVs with picture settings, not sticks
+            add(grid, R.drawable.ic_picture, getString(R.string.picture), null, () -> open(picture));
+        }
+        add(grid, R.drawable.ic_storage, getString(R.string.storage), storageStatus(),
                 () -> open(new Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)));
-        add(grid, R.drawable.ic_apps, "Apps", null,
+        add(grid, R.drawable.ic_apps, getString(R.string.apps), null,
                 () -> open(new Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS)));
-        add(grid, R.drawable.ic_landscape, "Screensaver", "Start now",
+        add(grid, R.drawable.ic_landscape, getString(R.string.screensaver), getString(R.string.start_now),
                 () -> open(new Intent("com.google.android.pano.action.SLEEP"))); // starts the screensaver
         if (HomeKeyService.instance != null) {
-            add(grid, R.drawable.ic_power, "Power", "Sleep / restart", () -> {
+            add(grid, R.drawable.ic_power, getString(R.string.power), getString(R.string.sleep_restart), () -> {
                 finish();
                 HomeKeyService.instance.performGlobalAction(AccessibilityService.GLOBAL_ACTION_POWER_DIALOG);
             });
         }
-        View all = add(grid, R.drawable.ic_settings, "All settings", null,
+        View all = add(grid, R.drawable.ic_settings, getString(R.string.all_settings), null,
                 () -> open(new Intent(Settings.ACTION_SETTINGS)));
         if (grid.getChildCount() % 2 == 1) { // last tile spans the row when the count is odd
             GridLayout.LayoutParams lp = (GridLayout.LayoutParams) all.getLayoutParams();
@@ -106,14 +112,14 @@ public class QuickPanelActivity extends Activity {
     private String networkStatus() {
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);
         NetworkCapabilities c = cm == null ? null : cm.getNetworkCapabilities(cm.getActiveNetwork());
-        if (c == null) return "Not connected";
-        if (c.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) return "Ethernet";
-        return c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ? "Wi-Fi connected" : "Connected";
+        if (c == null) return getString(R.string.not_connected);
+        if (c.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) return getString(R.string.ethernet);
+        return c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ? getString(R.string.wifi_connected) : getString(R.string.connected);
     }
 
     private String storageStatus() {
         android.os.StatFs fs = new android.os.StatFs(android.os.Environment.getDataDirectory().getPath());
-        return String.format(java.util.Locale.getDefault(), "%.1f GB free", fs.getAvailableBytes() / 1e9);
+        return String.format(java.util.Locale.getDefault(), getString(R.string.gb_free), fs.getAvailableBytes() / 1e9);
     }
 
     private void open(Intent i) {
