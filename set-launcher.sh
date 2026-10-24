@@ -19,7 +19,13 @@ SVC=com.tvhome.launcher/com.tvhome.launcher.HomeKeyService
 cur=$($A shell settings get secure enabled_accessibility_services | tr -d '\r')
 case "$cur" in *"$SVC"*) ;; null|"") $A shell settings put secure enabled_accessibility_services "$SVC" ;; *) $A shell settings put secure enabled_accessibility_services "$cur:$SVC" ;; esac
 $A shell settings put secure accessibility_enabled 1
+# Optionally keep Wireless debugging on across reboots (Android turns it off at boot)
+if [ "$KEEP_ADB_WIFI" = 1 ]; then
+  $A shell pm grant com.tvhome.launcher android.permission.WRITE_SECURE_SETTINGS && KEEP=true
+else
+  $A shell pm revoke com.tvhome.launcher android.permission.WRITE_SECURE_SETTINGS 2>/dev/null; KEEP=false
+fi
 # This TV's dock and button remaps (receiver only accepts ADB/shell, via the DUMP permission)
 $A shell am broadcast -a com.tvhome.launcher.CONFIGURE -n com.tvhome.launcher/.ConfigReceiver \
-  --es dock "'$DOCK'" --es keymap "'$KEYMAP'" --es hidden "'$HIDDEN'" | tail -1
+  --es dock "'$DOCK'" --es keymap "'$KEYMAP'" --es hidden "'$HIDDEN'" --ez keep_adb_wifi $KEEP | tail -1
 $A shell input keyevent KEYCODE_HOME

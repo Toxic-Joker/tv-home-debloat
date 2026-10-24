@@ -25,6 +25,9 @@ for k in window_animation_scale transition_animation_scale animator_duration_sca
 for k in screensaver_components screensaver_default_component screensaver_enabled enabled_accessibility_services accessibility_enabled; do restore_setting secure $k; done
 restore_setting system screen_off_timeout
 
+# TV Home no longer gets to change secure settings (keep-Wireless-debugging option)
+$A shell pm revoke com.tvhome.launcher android.permission.WRITE_SECURE_SETTINGS 2>/dev/null
+
 # 3) Original home launcher
 orig=$(tail -1 "$B/home-launcher.txt" | tr -d '\r')
 $A shell cmd package set-home-activity --user 0 "$orig"

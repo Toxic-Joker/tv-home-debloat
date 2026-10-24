@@ -13,6 +13,6 @@ DEVICE=$($A shell getprop ro.product.device | tr -d '\r')
 BDIR="backup/$DEVICE"
 LOG="$BDIR/debloat-applied.txt"
 PROFILE="profiles/$DEVICE.sh"
-PKGS=(); DOCK=""; KEYMAP=""; HIDDEN=""
+PKGS=(); DOCK=""; KEYMAP=""; HIDDEN=""; KEEP_ADB_WIFI=0
 [ -f "$PROFILE" ] && . "$PROFILE"
 echo "TV $TV: $($A shell getprop ro.product.manufacturer | tr -d '\r') $($A shell getprop ro.product.model | tr -d '\r') [$DEVICE]"

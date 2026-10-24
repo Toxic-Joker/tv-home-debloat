@@ -45,3 +45,7 @@ HIDDEN=""
 #   192 Xiaomi TV+ -> Apple TV        284 APPS -> All apps
 # Untouched: Netflix 193 (still opens Netflix), mic 186 (Assistant disabled; left unbound)
 KEYMAP="190=app:org.smarttube.stable,194=app:app.netmirror.newtv,192=app:com.apple.atve.androidtv.appletv,284=allapps"
+
+# Android switches Wireless debugging off at every boot; TV Home turns it back on so the
+# scripts can always reach the stick (new computers still need approval on screen)
+KEEP_ADB_WIFI=1

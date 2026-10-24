@@ -3,6 +3,10 @@ package com.tvhome.launcher;
 import android.accessibilityservice.AccessibilityService;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.provider.Settings;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -26,6 +30,7 @@ public class HomeKeyService extends AccessibilityService {
     private final SparseArray<String> keymap = new SparseArray<>();
     private boolean debugKeys;
     private final SharedPreferences.OnSharedPreferenceChangeListener prefsChanged = (p, k) -> loadPrefs();
+    private ConnectivityManager.NetworkCallback networkCallback;
     private final Runnable openPanel = () -> {
         opened = true;
         startActivity(new Intent(this, QuickPanelActivity.class)
@@ -40,6 +45,25 @@ public class HomeKeyService extends AccessibilityService {
         prefs = getSharedPreferences("home", MODE_PRIVATE);
         prefs.registerOnSharedPreferenceChangeListener(prefsChanged);
         loadPrefs();
+        // This service starts at every boot, so it also keeps Wireless debugging on where asked:
+        // Android switches it off on reboot, and set-launcher.sh then can't reach the TV.
+        networkCallback = new ConnectivityManager.NetworkCallback() {
+            @Override public void onAvailable(Network n) { main.postDelayed(HomeKeyService.this::keepAdbWifi, 3000); }
+        };
+        getSystemService(ConnectivityManager.class).registerDefaultNetworkCallback(networkCallback);
+    }
+
+    private void keepAdbWifi() {
+        if (!prefs.getBoolean("keep_adb_wifi", false)) return;
+        if (checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") != PackageManager.PERMISSION_GRANTED) return;
+        try {
+            if (Settings.Global.getInt(getContentResolver(), "adb_wifi_enabled", 0) != 1) {
+                Settings.Global.putInt(getContentResolver(), "adb_wifi_enabled", 1);
+                Log.i("TvHomeKey", "re-enabled wireless debugging");
+            }
+        } catch (Exception e) {
+            Log.w("TvHomeKey", "could not enable wireless debugging", e);
+        }
     }
 
     private void loadPrefs() {
@@ -75,6 +99,7 @@ public class HomeKeyService extends AccessibilityService {
     @Override public boolean onUnbind(Intent intent) {
         instance = null;
         if (prefs != null) prefs.unregisterOnSharedPreferenceChangeListener(prefsChanged);
+        if (networkCallback != null) getSystemService(ConnectivityManager.class).unregisterNetworkCallback(networkCallback);
         return super.onUnbind(intent);
     }
 

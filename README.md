@@ -61,7 +61,7 @@ so their apps (and `com.mediatek.*`, `com.google.android.tv.inputplayer`) are ne
 
 ## Adding another TV
 1. `TV=<ip>:5555 ./backup.sh` (prints the device name, e.g. `[nagata]`).
-2. Copy a profile to `profiles/<device>.sh` and edit `PKGS`, `DOCK`, `HIDDEN`, `KEYMAP`.
+2. Copy a profile to `profiles/<device>.sh` and edit `PKGS`, `DOCK`, `HIDDEN`, `KEYMAP`, `KEEP_ADB_WIFI`.
    Keep anything a remote button launches (check `dumpsys window`'s global keys and test each button).
 3. `TV=<ip>:5555 ./debloat.sh && TV=<ip>:5555 launcher/build-and-install.sh && TV=<ip>:5555 ./set-launcher.sh`
 
@@ -76,7 +76,10 @@ To test the hold-Home panel or remaps over ADB, use `adb shell uinput /data/loca
 (push `tools/hold-home.json` first; `tools/key-f1..f3.json` press F1–F3 for temporary test remaps).
 `adb shell input keyevent` bypasses accessibility services, so it can't trigger them.
 
-If the TV's ADB is off (it turns off after a reboot), re-enable it in
-Settings -> System -> Developer options, then `tools/platform-tools/adb connect "$(cat .tv)"`.
+Android switches Wireless debugging off at every boot. With `KEEP_ADB_WIFI=1` in a profile (set on the
+Mi TV Stick), `set-launcher.sh` grants TV Home `WRITE_SECURE_SETTINGS` and its key service turns
+Wireless debugging back on after boot and on Wi-Fi reconnects. New computers still need approval on the TV;
+`restore.sh` revokes the permission. Otherwise, re-enable it in Settings -> System -> Developer options,
+then `tools/platform-tools/adb connect "$(cat .tv)"`.
 
 Wallpapers: Wikimedia Commons Featured Pictures (CC BY-SA / public domain).
