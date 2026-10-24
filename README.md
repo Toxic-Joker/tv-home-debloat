@@ -52,6 +52,9 @@ adb logcat -s TvHomeKey   # press buttons; turn off again with --ez debug_keys f
 ```
 The CONFIGURE receiver needs the DUMP permission, so only ADB can change the dock or remaps.
 
+On the Mi TV Stick: YouTube → SmartTube, Prime Video → NetMirrorTV, Xiaomi TV+ → Apple TV, APPS → All apps
+(their stock apps are disabled); Netflix unchanged.
+
 On the Continental Edison TV: YouTube → SmartTube, Gear → quick panel, Person → Accounts, ⋮⋮⋮ → All apps.
 Netflix, Prime Video, USB, TV, Input and the mic (Bluetooth pairing) stay with the TV's own services,
 so their apps (and `com.mediatek.*`, `com.google.android.tv.inputplayer`) are never disabled.

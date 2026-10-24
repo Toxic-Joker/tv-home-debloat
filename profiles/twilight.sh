@@ -34,7 +34,14 @@ PKGS=(
   com.android.federatedcompute.services
 )
 
-# TV Home dock (left to right) and remote key remaps (none needed on this stick)
+# TV Home dock (left to right)
 DOCK="org.smarttube.stable,com.sportzx.live,com.miruronative,com.apple.atve.androidtv.appletv"
-KEYMAP=""
 HIDDEN=""
+
+# Xiaomi remote buttons TV Home takes over (Android keycode=target).
+# Targets: panel, allapps, app:<package>, action:<intent action>
+# Their stock apps are disabled above, so the buttons were dead:
+#   190 YouTube -> SmartTube          194 Prime Video -> NetMirrorTV
+#   192 Xiaomi TV+ -> Apple TV        284 APPS -> All apps
+# Untouched: Netflix 193 (still opens Netflix), mic 186 (Assistant disabled; left unbound)
+KEYMAP="190=app:org.smarttube.stable,194=app:app.netmirror.newtv,192=app:com.apple.atve.androidtv.appletv,284=allapps"
