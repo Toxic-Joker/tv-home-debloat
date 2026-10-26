@@ -82,4 +82,5 @@ Wireless debugging back on after boot and on Wi-Fi reconnects. New computers sti
 `restore.sh` revokes the permission. Otherwise, re-enable it in Settings -> System -> Developer options,
 then `tools/platform-tools/adb connect "$(cat .tv)"`.
 
-Wallpapers: Wikimedia Commons Featured Pictures (CC BY-SA / public domain).
+Wallpapers: Wikimedia Commons Featured Pictures, cropped and resized; authors and licenses in
+[launcher/assets/wallpapers/ATTRIBUTION.md](launcher/assets/wallpapers/ATTRIBUTION.md).
