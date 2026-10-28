@@ -26,6 +26,7 @@ PKGS=(
   com.android.tv.feedbackconsent
   com.google.android.syncadapters.calendar
   com.android.printspooler
+  com.google.android.tts                      # Text-to-speech (only for TalkBack); voices ~200 MB
   # --- Bundled streaming apps (not used) ---
   com.amazon.amazonvideo.livingroom           # Prime Video
   # --- Ad / personalization sandbox (may refuse: mainline module) ---
@@ -49,3 +50,8 @@ KEYMAP="190=app:org.smarttube.stable,194=app:app.netmirror.newtv,192=app:com.app
 # Android switches Wireless debugging off at every boot; TV Home turns it back on so the
 # scripts can always reach the stick (new computers still need approval on screen)
 KEEP_ADB_WIFI=1
+
+# free-space.sh: keep the Google TV launcher's update so restore.sh brings back today's Google TV,
+# and drop the downloaded text-to-speech voices
+KEEP_UPDATES="com.google.android.apps.tv.launcherx"
+CLEAR_DATA="com.google.android.tts"

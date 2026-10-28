@@ -136,7 +136,7 @@ final class Theme {
                 px[y * w + x] = ((int) (Color.alpha(p) * keep) << 24) | (p & 0x00FFFFFF);
             }
         }
-        l.art = Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888);
+        l.art = Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888); // at most 320x180 (~230 KB)
         return l;
     }
 

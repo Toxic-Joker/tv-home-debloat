@@ -5,7 +5,7 @@
     android:versionName="1.0">
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- Only granted by set-launcher.sh (pm grant) on TVs whose profile sets KEEP_ADB_WIFI -->
+    <!-- Granted by set-launcher.sh (pm grant): re-enable the key service, optionally keep Wireless debugging on -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />

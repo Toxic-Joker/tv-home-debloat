@@ -28,6 +28,7 @@ Everything here is reversible: apps are only *disabled* (`pm disable-user`), nev
 | `debloat.sh` | Disables the profile's packages (ads, tracking, unused features); animations set to 0.5x |
 | `launcher/` | TV Home source (plain Java, no Gradle) + `build-and-install.sh` |
 | `set-launcher.sh` | Makes TV Home the Home button launcher and Nature Slideshow the screensaver, enables the key service and applies the profile's dock / remaps |
+| `free-space.sh` | Optional: rolls disabled apps back to their factory version (frees their downloaded updates) and clears the profile's `CLEAR_DATA` packages |
 | `restore.sh` | Undo everything (`--remove-launcher` also uninstalls TV Home) |
 | `tools/setup.sh` | Fetches adb and the SDK build tools locally |
 
@@ -40,7 +41,7 @@ Everything here is reversible: apps are only *disabled* (`pm disable-user`), nev
   It works through a small accessibility service ("TV Home quick panel") that only watches the Home key.
 - Three looks, cycled from the quick panel (**Home style** tile) or set with
   `--es style cinema|glass|shelf` on the CONFIGURE broadcast:
-  **Cinema** (wide artwork, big title of the focused app, colour glow), **Glass**
+  **Cinema** (default: glossy rounded-square logos, big title of the focused app, colour glow), **Glass**
   (glossy rounded squares with the logo auto-cropped from the app's banner, floor reflection,
   frosted app library) and **Top Shelf** (Apple TV-like: full-bleed wallpaper shelf over one grid,
   favourites first, name shown only on the focused tile).
@@ -60,6 +61,9 @@ adb shell am broadcast -a com.tvhome.launcher.CONFIGURE -n com.tvhome.launcher/.
 adb logcat -s TvHomeKey   # press buttons; turn off again with --ez debug_keys false
 ```
 The CONFIGURE receiver needs the DUMP permission, so only ADB can change the dock or remaps.
+Android removes an accessibility service from the enabled list whenever its app is force-stopped
+(Settings > Force stop, memory cleaners). TV Home switches its key service back on each time the
+home screen appears, using the `WRITE_SECURE_SETTINGS` permission `set-launcher.sh` grants.
 
 On the Mi TV Stick: YouTube → SmartTube, Prime Video → NetMirrorTV, Xiaomi TV+ → Apple TV, APPS → All apps
 (their stock apps are disabled); Netflix unchanged.
@@ -70,7 +74,8 @@ so their apps (and `com.mediatek.*`, `com.google.android.tv.inputplayer`) are ne
 
 ## Adding another TV
 1. `TV=<ip>:5555 ./backup.sh` (prints the device name, e.g. `[nagata]`).
-2. Copy a profile to `profiles/<device>.sh` and edit `PKGS`, `DOCK`, `HIDDEN`, `KEYMAP`, `KEEP_ADB_WIFI`.
+2. Copy a profile to `profiles/<device>.sh` and edit `PKGS`, `DOCK`, `HIDDEN`, `KEYMAP`, `KEEP_ADB_WIFI`,
+   `KEEP_UPDATES`, `CLEAR_DATA`.
    Keep anything a remote button launches (check `dumpsys window`'s global keys and test each button).
 3. `TV=<ip>:5555 ./debloat.sh && TV=<ip>:5555 launcher/build-and-install.sh && TV=<ip>:5555 ./set-launcher.sh`
 
@@ -79,6 +84,7 @@ so their apps (and `com.mediatek.*`, `com.google.android.tv.inputplayer`) are ne
 ./backup.sh && ./debloat.sh && launcher/build-and-install.sh && ./set-launcher.sh   # first-time setup
 ./launcher/build-and-install.sh     # rebuild + reinstall after editing the launcher
 ./debloat.sh && ./set-launcher.sh   # re-apply after a firmware update re-enables things
+./free-space.sh                     # optional: reclaim storage held by disabled apps
 ./restore.sh                        # back to stock Google TV
 ```
 To test the hold-Home panel or remaps over ADB, use `adb shell uinput /data/local/tmp/hold-home.json`

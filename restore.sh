@@ -2,6 +2,7 @@
 # Undo everything debloat.sh / set-launcher.sh did, using the backup taken beforehand.
 #   ./restore.sh                     re-enable apps, restore settings + Google TV launcher
 #   ./restore.sh --remove-launcher   ...and also uninstall the TV Home launcher
+# Apps rolled back by free-space.sh come back as their factory version; Play Store updates them.
 #   BACKUP=backup/<device>/<timestamp> ./restore.sh   use a specific backup snapshot
 set -u
 . "$(dirname "$0")/lib.sh"

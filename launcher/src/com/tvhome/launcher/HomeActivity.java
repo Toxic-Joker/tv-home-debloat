@@ -68,7 +68,7 @@ public class HomeActivity extends Activity {
     private final Map<String, App> apps = new LinkedHashMap<>();
     private SharedPreferences prefs;
     private final SharedPreferences.OnSharedPreferenceChangeListener prefsChanged = (p, key) -> {
-        if ("dock".equals(key)) { if (this.glass) loadApps(); else renderApps(); } // glass: crop new dock logos
+        if ("dock".equals(key)) { if (this.glass) loadApps(); else renderApps(); } // glass crops logos for dock apps only
         if ("hidden".equals(key)) loadApps();
         if ("style".equals(key)) recreate();
     };
@@ -133,6 +133,7 @@ public class HomeActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        ensureKeyService();
         rotator.start();
         main.post(greetingTick);
     }
@@ -140,6 +141,26 @@ public class HomeActivity extends Activity {
     @Override public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus && getCurrentFocus() == null) backToDock();
+    }
+
+    /**
+     * Android drops an accessibility service from the enabled list whenever its app is force-stopped
+     * (Settings > Force stop, memory cleaners, updates). Without it the remote remaps and hold-Home
+     * stop working, so turn it back on each time the home screen shows (needs WRITE_SECURE_SETTINGS,
+     * granted by set-launcher.sh).
+     */
+    private void ensureKeyService() {
+        if (checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") != PackageManager.PERMISSION_GRANTED) return;
+        String svc = getPackageName() + "/" + HomeKeyService.class.getName();
+        try {
+            String cur = Settings.Secure.getString(getContentResolver(), "enabled_accessibility_services");
+            if (cur != null && cur.contains(svc)) return;
+            Settings.Secure.putString(getContentResolver(), "enabled_accessibility_services",
+                    cur == null || cur.isEmpty() ? svc : cur + ":" + svc);
+            Settings.Secure.putInt(getContentResolver(), "accessibility_enabled", 1);
+        } catch (Exception e) {
+            android.util.Log.w("TvHome", "could not re-enable key service", e);
+        }
     }
 
     /** Launcher hidden behind an app: give back the wallpaper bitmaps and GPU textures. */
@@ -320,7 +341,7 @@ public class HomeActivity extends Activity {
         tlp.topMargin = Ui.dp(this, 6);
         hero.addView(heroTitle, tlp);
         FrameLayout.LayoutParams hlp = new FrameLayout.LayoutParams(Ui.dp(this, 700), -2, Gravity.BOTTOM | Gravity.START);
-        hlp.setMargins(Ui.dp(this, 56), 0, 0, Ui.dp(this, 212));
+        hlp.setMargins(Ui.dp(this, 56), 0, 0, Ui.dp(this, 236));
         parent.addView(hero, hlp);
 
         parent.addView(dockStrip(false), dockParams(false));
@@ -515,7 +536,7 @@ public class HomeActivity extends Activity {
                     a.accent = Theme.accentOf(logo); // once per app, off the UI thread
                     a.edge = a.banner != null ? Theme.edgeOf(a.banner) : Theme.shade(a.accent, 0.35f);
                     a.category = categoryName(ai.applicationInfo.category);
-                    if (glass && a.banner != null && dockSet.contains(a.pkg)) a.logo = Theme.logoOf(a.banner);
+                    if (a.banner != null && !shelf && (!glass || dockSet.contains(a.pkg))) a.logo = Theme.logoOf(a.banner);
                     found.put(a.pkg, a);
                 }
             }
@@ -602,7 +623,7 @@ public class HomeActivity extends Activity {
 
     // ---------------------------------------------------------------- Tiles
 
-    private static final float CINEMA_W = 176, CINEMA_H = 99, GLASS_SIZE = 150;
+    private static final float CINEMA_SIZE = 132, GLASS_SIZE = 150;
 
     /** Wide banner artwork; logo-only apps get their icon on a tinted card. */
     private FrameLayout artwork(App a, float wDp, float hDp, float radiusDp) {
@@ -631,42 +652,13 @@ public class HomeActivity extends Activity {
         return t;
     }
 
-    private View cinemaDockTile(App a, int index) {
-        LinearLayout cell = new LinearLayout(this);
-        cell.setOrientation(LinearLayout.VERTICAL);
-        Ui.noClip(cell);
-        FrameLayout t = artwork(a, CINEMA_W, CINEMA_H, 14);
-        cell.addView(t, new LinearLayout.LayoutParams(Ui.dp(this, CINEMA_W), Ui.dp(this, CINEMA_H)));
-        TextView name = label(a.label, 13);
-        name.setAlpha(0.55f);
-        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(Ui.dp(this, CINEMA_W), -2);
-        nlp.topMargin = Ui.dp(this, 12);
-        cell.addView(name, nlp);
-        makeFocusable(t, a, 1.1f, has -> {
-            name.animate().alpha(has ? 1f : 0.55f).translationY(has ? Ui.dp(this, 4) : 0).setDuration(Theme.FOCUS_MS).start();
-            t.animate().alpha(1f).setDuration(Theme.FOCUS_MS).start();
-            if (has) { lastDockIndex = index; focusHero(a); moveGlow(t, a, false); }
-        });
-        return cell;
-    }
-
     /**
      * Glossy rounded square (Apple-style app icon): seamless two-tone background taken from the
-     * banner's own edges, the logo cropped to fill it, a top gloss, bottom shade, hairline edge and
-     * a static contact shadow. Everything is plain drawables: no blur, no elevation.
+     * banner's own edges, the logo cropped to fill it, a top gloss, bottom shade and hairline edge.
+     * Everything is plain drawables: no blur, no elevation.
      */
-    private View glassDockTile(App a, int index) {
-        float s = GLASS_SIZE, r = s * 0.24f;
-        float rp = Ui.dp(this, r);
-        FrameLayout wrap = new FrameLayout(this); // [contact shadow, tile]
-        Ui.noClip(wrap);
-        View shadow = new View(this);
-        shadow.setBackground(Theme.glow(0xFF000000, Ui.dp(this, s * 0.55f)));
-        shadow.setScaleY(0.22f);
-        FrameLayout.LayoutParams slp = new FrameLayout.LayoutParams(Ui.dp(this, s * 1.1f), Ui.dp(this, s * 1.1f), Gravity.CENTER_HORIZONTAL);
-        slp.topMargin = Ui.dp(this, s * 0.48f);
-        wrap.addView(shadow, slp);
-
+    private FrameLayout glossyTile(App a, float s) {
+        float rp = Ui.dp(this, s * 0.24f);
         FrameLayout t = new FrameLayout(this);
         Ui.clipRounded(t, rp);
         int top, bottom;
@@ -678,11 +670,11 @@ public class HomeActivity extends Activity {
 
         ImageView iv = new ImageView(this);
         iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        int pad = Ui.dp(this, s * 0.14f);
         if (a.logo != null) {
             BitmapDrawable d = new BitmapDrawable(getResources(), a.logo.art);
             d.setFilterBitmap(true);
             iv.setImageDrawable(d);
+            int pad = Ui.dp(this, s * 0.14f);
             iv.setPadding(pad, pad, pad, pad);
             t.addView(iv, new FrameLayout.LayoutParams(-1, -1));
         } else {
@@ -703,9 +695,55 @@ public class HomeActivity extends Activity {
         e.setStroke(Math.max(1, Ui.dp(this, 1)), 0x47FFFFFF);
         edge.setBackground(e);
         t.addView(edge, new FrameLayout.LayoutParams(-1, -1));
+        return t;
+    }
+
+    /** Static soft shadow under a tile (a flattened radial gradient). */
+    private View contactShadow(FrameLayout parent, float s) {
+        View shadow = new View(this);
+        shadow.setBackground(Theme.glow(0xFF000000, Ui.dp(this, s * 0.55f)));
+        shadow.setScaleY(0.22f);
+        FrameLayout.LayoutParams slp = new FrameLayout.LayoutParams(Ui.dp(this, s * 1.1f), Ui.dp(this, s * 1.1f), Gravity.CENTER_HORIZONTAL);
+        slp.topMargin = Ui.dp(this, s * 0.48f);
+        parent.addView(shadow, slp);
+        return shadow;
+    }
+
+    /** Cinema: glossy logo square with its name underneath; the big title and colour glow follow focus. */
+    private View cinemaDockTile(App a, int index) {
+        float s = CINEMA_SIZE;
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setGravity(Gravity.CENTER_HORIZONTAL);
+        Ui.noClip(cell);
+        FrameLayout wrap = new FrameLayout(this);
+        Ui.noClip(wrap);
+        View shadow = contactShadow(wrap, s);
+        FrameLayout t = glossyTile(a, s);
+        wrap.addView(t, new FrameLayout.LayoutParams(Ui.dp(this, s), Ui.dp(this, s)));
+        cell.addView(wrap, new LinearLayout.LayoutParams(Ui.dp(this, s), Ui.dp(this, s)));
+        TextView name = label(a.label, 13);
+        name.setGravity(Gravity.CENTER);
+        name.setAlpha(0.55f);
+        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(Ui.dp(this, s + 20), -2);
+        nlp.topMargin = Ui.dp(this, 16);
+        cell.addView(name, nlp);
+        makeFocusable(t, a, 1.1f, has -> {
+            name.animate().alpha(has ? 1f : 0.55f).translationY(has ? Ui.dp(this, 6) : 0).setDuration(Theme.FOCUS_MS).start();
+            shadow.animate().scaleX(has ? 1.15f : 1f).alpha(has ? 0.7f : 1f).setDuration(Theme.FOCUS_MS).start();
+            if (has) { lastDockIndex = index; focusHero(a); moveGlow(t, a, false); }
+        });
+        return cell;
+    }
+
+    private View glassDockTile(App a, int index) {
+        float s = GLASS_SIZE;
+        FrameLayout wrap = new FrameLayout(this); // [contact shadow, tile]
+        Ui.noClip(wrap);
+        View shadow = contactShadow(wrap, s);
+        FrameLayout t = glossyTile(a, s);
         wrap.addView(t, new FrameLayout.LayoutParams(Ui.dp(this, s), Ui.dp(this, s)));
         wrap.setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(this, s), Ui.dp(this, s)));
-
         makeFocusable(t, a, 1.1f, has -> {
             shadow.animate().scaleX(has ? 1.15f : 1f).alpha(has ? 0.7f : 1f).setDuration(Theme.FOCUS_MS).start();
             if (has) { lastDockIndex = index; heroTitle.setText(a.label); moveGlow(t, a, true); }
@@ -714,19 +752,22 @@ public class HomeActivity extends Activity {
     }
 
     private View cinemaGridCell(App a) {
+        float s = 104;
         LinearLayout cell = new LinearLayout(this);
         cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setGravity(Gravity.CENTER_HORIZONTAL);
         Ui.noClip(cell);
-        FrameLayout t = artwork(a, 144, 81, 12);
-        cell.addView(t, new LinearLayout.LayoutParams(Ui.dp(this, 144), Ui.dp(this, 81)));
+        FrameLayout t = glossyTile(a, s);
+        cell.addView(t, new LinearLayout.LayoutParams(Ui.dp(this, s), Ui.dp(this, s)));
         TextView name = label(a.label, 12);
+        name.setGravity(Gravity.CENTER);
         name.setAlpha(0.6f);
-        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(Ui.dp(this, 144), -2);
-        nlp.topMargin = Ui.dp(this, 8);
+        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(Ui.dp(this, 124), -2);
+        nlp.topMargin = Ui.dp(this, 10);
         cell.addView(name, nlp);
-        makeFocusable(t, a, 1.08f, has -> name.setAlpha(has ? 1f : 0.6f));
+        makeFocusable(t, a, 1.1f, has -> name.setAlpha(has ? 1f : 0.6f));
         GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-        lp.setMargins(Ui.dp(this, 12), Ui.dp(this, 10), Ui.dp(this, 12), Ui.dp(this, 10));
+        lp.setMargins(Ui.dp(this, 10), Ui.dp(this, 12), Ui.dp(this, 10), Ui.dp(this, 12));
         cell.setLayoutParams(lp);
         return wrapForGrid(cell, t);
     }
