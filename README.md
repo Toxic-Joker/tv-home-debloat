@@ -38,10 +38,15 @@ Everything here is reversible: apps are only *disabled* (`pm disable-user`), nev
 - **Hold Home** anywhere (even inside an app) for the quick panel: Network, Display & sound, Storage,
   Apps, Screensaver, Power (sleep / restart) and All settings. Back closes it and returns to the app.
   It works through a small accessibility service ("TV Home quick panel") that only watches the Home key.
-- Two looks, switchable from the quick panel (**Home style** tile) or with
-  `--es style cinema|glass` on the CONFIGURE broadcast:
-  **Cinema** (wide artwork, big title of the focused app, colour glow) and **Glass**
-  (glossy rounded squares with a floor reflection, frosted app library).
+- Three looks, cycled from the quick panel (**Home style** tile) or set with
+  `--es style cinema|glass|shelf` on the CONFIGURE broadcast:
+  **Cinema** (wide artwork, big title of the focused app, colour glow), **Glass**
+  (glossy rounded squares with the logo auto-cropped from the app's banner, floor reflection,
+  frosted app library) and **Top Shelf** (Apple TV-like: full-bleed wallpaper shelf over one grid,
+  favourites first, name shown only on the focused tile).
+- The quick panel is a control centre: round quick actions (Wi-Fi, screensaver, power, settings)
+  above pill controls (display & sound, storage with a usage bar, apps, home style).
+- While another app is open, TV Home releases its wallpaper bitmaps (about 40 MB on a Mi TV Stick).
 - English and French UI (follows the TV's language).
 - Wallpapers crossfade every 10 minutes (screensaver: every minute). Add or replace JPEGs in
   `launcher/assets/wallpapers/` (1920x1080) and add a caption line to `credits.txt`, then rebuild.

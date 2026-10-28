@@ -35,10 +35,16 @@ if [ "${1:-}" != "--no-install" ]; then
   SVC=com.tvhome.launcher/com.tvhome.launcher.HomeKeyService
   before=$($ADB -s $TV shell settings get secure enabled_accessibility_services | tr -d '\r')
   $ADB -s $TV install -r tv-home.apk
-  # Some firmwares drop an updated app's accessibility service; put it back if it was on
+  # Android switches an updated app's accessibility service off (sometimes a few seconds later);
+  # if it was on before, keep switching it back on until it sticks.
   case "$before" in *"$SVC"*)
-    now=$($ADB -s $TV shell settings get secure enabled_accessibility_services | tr -d '\r')
-    case "$now" in *"$SVC"*) ;; *) $ADB -s $TV shell settings put secure enabled_accessibility_services "$before"
-                                   echo "Re-enabled TV Home's accessibility service" ;; esac ;;
+    for i in 1 2 3 4 5 6; do
+      sleep 2
+      now=$($ADB -s $TV shell settings get secure enabled_accessibility_services | tr -d '\r')
+      case "$now" in *"$SVC"*) [ $i -ge 3 ] && break ;;
+        *) $ADB -s $TV shell settings put secure enabled_accessibility_services "$before"
+           $ADB -s $TV shell settings put secure accessibility_enabled 1 ;; esac
+    done
+    echo "Key service: $($ADB -s $TV shell settings get secure enabled_accessibility_services | tr -d '\r')" ;;
   esac
 fi

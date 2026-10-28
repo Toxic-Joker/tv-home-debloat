@@ -42,4 +42,6 @@
         <item quantity="one">%d application</item>
         <item quantity="other">%d applications</item>
     </plurals>
+    <string name="settings_short">Paramètres</string>
+    <string name="style_shelf">Vitrine</string>
 </resources>

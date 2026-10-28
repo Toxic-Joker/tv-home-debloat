@@ -80,6 +80,15 @@ final class WallpaperRotator {
         main.removeCallbacks(tick);
     }
 
+    /** Free the decoded wallpaper while the launcher is hidden; start() shows the next one. */
+    void release() {
+        front.animate().cancel();
+        front.setImageDrawable(null);
+        back.setImageDrawable(null);
+        index = Math.max(0, index - 1); // come back to the same photo
+        if (shown != null) { shown.recycle(); shown = null; }
+    }
+
     private void next() {
         final String file = files.get(index++ % files.size());
         IO.execute(() -> {

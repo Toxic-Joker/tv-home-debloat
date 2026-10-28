@@ -60,6 +60,7 @@ public class HomeActivity extends Activity {
         String pkg, label, category;
         Drawable banner, icon;
         int accent, edge;
+        Theme.Logo logo; // cropped banner logo for glossy square tiles (dock apps only)
     }
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
@@ -67,12 +68,14 @@ public class HomeActivity extends Activity {
     private final Map<String, App> apps = new LinkedHashMap<>();
     private SharedPreferences prefs;
     private final SharedPreferences.OnSharedPreferenceChangeListener prefsChanged = (p, key) -> {
-        if ("dock".equals(key)) renderApps();
+        if ("dock".equals(key)) { if (this.glass) loadApps(); else renderApps(); } // glass: crop new dock logos
         if ("hidden".equals(key)) loadApps();
         if ("style".equals(key)) recreate();
     };
     private WallpaperRotator rotator;
-    private boolean glass;
+    private boolean glass, shelf;
+    private FrameLayout shelfArt;
+    private ScrollView shelfScroll;
 
     private FrameLayout backdrop, homeLayer, library;
     private LinearLayout dockRow;
@@ -101,11 +104,12 @@ public class HomeActivity extends Activity {
         prefs = getSharedPreferences("home", MODE_PRIVATE);
         prefs.registerOnSharedPreferenceChangeListener(prefsChanged);
         glass = Theme.STYLE_GLASS.equals(Theme.style(this));
-        buildUi();
+        shelf = Theme.STYLE_SHELF.equals(Theme.style(this));
+        if (shelf) buildShelfUi(); else buildUi();
         rotator = new WallpaperRotator(this, (ImageView) findViewById(R.id.wp_front),
                 (ImageView) findViewById(R.id.wp_back), (TextView) findViewById(R.id.caption),
                 getResources().getInteger(R.integer.wallpaper_minutes) * 60_000L);
-        rotator.setBlurListener(b -> {
+        if (!shelf) rotator.setBlurListener(b -> {
             BitmapDrawable d = new BitmapDrawable(getResources(), b);
             d.setFilterBitmap(true);
             frost.setImageDrawable(d);
@@ -138,6 +142,15 @@ public class HomeActivity extends Activity {
         if (hasFocus && getCurrentFocus() == null) backToDock();
     }
 
+    /** Launcher hidden behind an app: give back the wallpaper bitmaps and GPU textures. */
+    @Override public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level >= TRIM_MEMORY_UI_HIDDEN) {
+            rotator.release();
+            frost.setImageDrawable(null);
+        }
+    }
+
     @Override protected void onPause() {
         rotator.stop();
         main.removeCallbacks(greetingTick);
@@ -159,7 +172,7 @@ public class HomeActivity extends Activity {
             int k = e.getKeyCode();
             View f = getCurrentFocus();
             boolean inLibrary = library.getVisibility() == View.VISIBLE;
-            if (!inLibrary && k == KeyEvent.KEYCODE_DPAD_DOWN && f != null && f.getParent() != null
+            if (!shelf && !inLibrary && k == KeyEvent.KEYCODE_DPAD_DOWN && f != null && f.getParent() != null
                     && isInDock(f)) { openLibrary(); return true; }
             if (inLibrary && k == KeyEvent.KEYCODE_DPAD_UP && f != null && grid.indexOfChild(f) >= 0
                     && grid.indexOfChild(f) < GRID_COLUMNS) { backToDock(); return true; }
@@ -426,6 +439,7 @@ public class HomeActivity extends Activity {
 
     private void openLibrary() {
         if (grid.getChildCount() == 0) { wantAllApps = true; return; }
+        if (shelf) { grid.getChildAt(0).requestFocus(); return; } // Top Shelf: All apps is the grid below
         if (library.getVisibility() != View.VISIBLE) {
             library.setVisibility(View.VISIBLE);
             library.setAlpha(0f);
@@ -446,6 +460,7 @@ public class HomeActivity extends Activity {
     }
 
     private void closeLibrary() {
+        if (shelf) { shelfScroll.smoothScrollTo(0, 0); return; }
         if (library.getVisibility() != View.VISIBLE) return;
         library.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
         homeLayer.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
@@ -461,8 +476,14 @@ public class HomeActivity extends Activity {
         if (v != null) dockTileOf(v).requestFocus();
     }
 
-    private View dockTileOf(View cell) { // cinema cells are [tile, label] columns
-        return cell instanceof LinearLayout ? ((LinearLayout) cell).getChildAt(0) : cell;
+    private View dockTileOf(View cell) { // cells wrap the focusable tile (label column, shadow frame)
+        if (cell.getTag() instanceof App || !(cell instanceof ViewGroup)) return cell;
+        ViewGroup g = (ViewGroup) cell;
+        for (int i = g.getChildCount() - 1; i >= 0; i--) {
+            View c = dockTileOf(g.getChildAt(i));
+            if (c.getTag() instanceof App) return c;
+        }
+        return cell;
     }
 
     private void updateGreeting() {
@@ -477,6 +498,7 @@ public class HomeActivity extends Activity {
             PackageManager pm = getPackageManager();
             Map<String, App> found = new LinkedHashMap<>();
             List<String> hidden = Arrays.asList(TextUtils.split(prefs.getString("hidden", ""), ","));
+            List<String> dockSet = dock();
             for (String cat : new String[] { Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER }) {
                 Intent q = new Intent(Intent.ACTION_MAIN).addCategory(cat);
                 for (ResolveInfo ri : pm.queryIntentActivities(q, 0)) {
@@ -493,6 +515,7 @@ public class HomeActivity extends Activity {
                     a.accent = Theme.accentOf(logo); // once per app, off the UI thread
                     a.edge = a.banner != null ? Theme.edgeOf(a.banner) : Theme.shade(a.accent, 0.35f);
                     a.category = categoryName(ai.applicationInfo.category);
+                    if (glass && a.banner != null && dockSet.contains(a.pkg)) a.logo = Theme.logoOf(a.banner);
                     found.put(a.pkg, a);
                 }
             }
@@ -556,17 +579,21 @@ public class HomeActivity extends Activity {
             App a = apps.get(pkg);
             if (a == null) continue;
             final int index = dockRow.getChildCount();
-            View cell = glass ? glassDockTile(a, index) : cinemaDockTile(a, index);
+            View cell = shelf ? shelfTile(a, index) : glass ? glassDockTile(a, index) : cinemaDockTile(a, index);
             LinearLayout.LayoutParams lp = cell.getLayoutParams() instanceof LinearLayout.LayoutParams
                     ? (LinearLayout.LayoutParams) cell.getLayoutParams() : new LinearLayout.LayoutParams(-2, -2);
-            if (index > 0) lp.leftMargin = gap;
+            if (index > 0 && !shelf) lp.leftMargin = gap; // shelf tiles carry grid-matching margins
             dockRow.addView(cell, lp);
         }
 
         grid.removeAllViews();
         List<App> sorted = new ArrayList<>(apps.values());
         Collections.sort(sorted, (x, y) -> x.label.compareToIgnoreCase(y.label));
-        for (App a : sorted) grid.addView(glass ? glassGridCell(a) : cinemaGridCell(a));
+        List<String> docked = dock();
+        for (App a : sorted) {
+            if (shelf && docked.contains(a.pkg)) continue; // Top Shelf: favourites are the first row
+            grid.addView(shelf ? shelfTile(a, -1) : glass ? glassGridCell(a) : cinemaGridCell(a));
+        }
         libraryCount.setText(getResources().getQuantityString(R.plurals.app_count, sorted.size(), sorted.size()));
 
         if (wantAllApps) { wantAllApps = false; main.post(this::openLibrary); }
@@ -575,7 +602,7 @@ public class HomeActivity extends Activity {
 
     // ---------------------------------------------------------------- Tiles
 
-    private static final float CINEMA_W = 176, CINEMA_H = 99, GLASS_SIZE = 112;
+    private static final float CINEMA_W = 176, CINEMA_H = 99, GLASS_SIZE = 150;
 
     /** Wide banner artwork; logo-only apps get their icon on a tinted card. */
     private FrameLayout artwork(App a, float wDp, float hDp, float radiusDp) {
@@ -623,43 +650,67 @@ public class HomeActivity extends Activity {
         return cell;
     }
 
+    /**
+     * Glossy rounded square (Apple-style app icon): seamless two-tone background taken from the
+     * banner's own edges, the logo cropped to fill it, a top gloss, bottom shade, hairline edge and
+     * a static contact shadow. Everything is plain drawables: no blur, no elevation.
+     */
     private View glassDockTile(App a, int index) {
-        float s = GLASS_SIZE, r = 28;
-        FrameLayout t = new FrameLayout(this);
+        float s = GLASS_SIZE, r = s * 0.24f;
         float rp = Ui.dp(this, r);
+        FrameLayout wrap = new FrameLayout(this); // [contact shadow, tile]
+        Ui.noClip(wrap);
+        View shadow = new View(this);
+        shadow.setBackground(Theme.glow(0xFF000000, Ui.dp(this, s * 0.55f)));
+        shadow.setScaleY(0.22f);
+        FrameLayout.LayoutParams slp = new FrameLayout.LayoutParams(Ui.dp(this, s * 1.1f), Ui.dp(this, s * 1.1f), Gravity.CENTER_HORIZONTAL);
+        slp.topMargin = Ui.dp(this, s * 0.48f);
+        wrap.addView(shadow, slp);
+
+        FrameLayout t = new FrameLayout(this);
         Ui.clipRounded(t, rp);
-        GradientDrawable bg;
-        if (a.banner != null) { // solid banner colour, so the banner's own background blends in
-            bg = Ui.rounded(a.edge, rp);
-        } else {
-            int base = Theme.shade(a.accent, 0.4f);
-            bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[] { lighten(base, 0.15f), Theme.shade(base, 0.8f) });
-            bg.setCornerRadius(rp);
-        }
+        int top, bottom;
+        if (a.logo != null) { top = a.logo.top; bottom = a.logo.bottom; }
+        else { int base = Theme.shade(a.accent, 0.42f); top = lighten(base, 0.12f); bottom = Theme.shade(base, 0.75f); }
+        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { top, bottom });
+        bg.setCornerRadius(rp);
         t.setBackground(bg);
+
         ImageView iv = new ImageView(this);
         iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        if (a.banner != null) { // logo from the banner, centred on its own background colour
-            iv.setImageDrawable(a.banner);
-            t.addView(iv, new FrameLayout.LayoutParams(-1, Ui.dp(this, s * 9 / 16), Gravity.CENTER));
+        int pad = Ui.dp(this, s * 0.14f);
+        if (a.logo != null) {
+            BitmapDrawable d = new BitmapDrawable(getResources(), a.logo.art);
+            d.setFilterBitmap(true);
+            iv.setImageDrawable(d);
+            iv.setPadding(pad, pad, pad, pad);
+            t.addView(iv, new FrameLayout.LayoutParams(-1, -1));
         } else {
             iv.setImageDrawable(a.icon);
-            int is = Ui.dp(this, s * 0.55f);
+            int is = Ui.dp(this, s * 0.56f);
             t.addView(iv, new FrameLayout.LayoutParams(is, is, Gravity.CENTER));
         }
-        View gloss = new View(this); // soft glossy sheen from the top edge
+        View gloss = new View(this); // light falling on the top half
         gloss.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[] { 0x33FFFFFF, 0x0AFFFFFF, 0x00FFFFFF, 0x14000000 }));
-        t.addView(gloss, new FrameLayout.LayoutParams(-1, -1));
+                new int[] { 0x40FFFFFF, 0x14FFFFFF, 0x00FFFFFF }));
+        t.addView(gloss, new FrameLayout.LayoutParams(-1, Ui.dp(this, s * 0.5f), Gravity.TOP));
+        View base = new View(this); // soft shade towards the bottom edge
+        base.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,
+                new int[] { 0x33000000, 0x00000000 }));
+        t.addView(base, new FrameLayout.LayoutParams(-1, Ui.dp(this, s * 0.35f), Gravity.BOTTOM));
         View edge = new View(this);
-        edge.setBackground(Theme.glass(this, r, 0));
+        GradientDrawable e = Ui.rounded(0, rp);
+        e.setStroke(Math.max(1, Ui.dp(this, 1)), 0x47FFFFFF);
+        edge.setBackground(e);
         t.addView(edge, new FrameLayout.LayoutParams(-1, -1));
-        t.setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(this, s), Ui.dp(this, s)));
-        makeFocusable(t, a, 1.12f, has -> {
+        wrap.addView(t, new FrameLayout.LayoutParams(Ui.dp(this, s), Ui.dp(this, s)));
+        wrap.setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(this, s), Ui.dp(this, s)));
+
+        makeFocusable(t, a, 1.1f, has -> {
+            shadow.animate().scaleX(has ? 1.15f : 1f).alpha(has ? 0.7f : 1f).setDuration(Theme.FOCUS_MS).start();
             if (has) { lastDockIndex = index; heroTitle.setText(a.label); moveGlow(t, a, true); }
         });
-        return t;
+        return wrap;
     }
 
     private View cinemaGridCell(App a) {
@@ -786,6 +837,135 @@ public class HomeActivity extends Activity {
     private static int lighten(int c, float f) {
         int r = (c >> 16) & 0xFF, g = (c >> 8) & 0xFF, b = c & 0xFF;
         return 0xFF000000 | ((int) (r + (255 - r) * f) << 16) | ((int) (g + (255 - g) * f) << 8) | (int) (b + (255 - b) * f);
+    }
+
+
+    // ---------------------------------------------------------------- Top Shelf (Apple TV-like)
+
+    private static final float SHELF_W = 142, SHELF_H = 89, SHELF_TOP = 290;
+
+    /** Wallpaper as a full-bleed "top shelf", fading into a single scrolling grid of 16:10 app tiles. */
+    private void buildShelfUi() {
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Theme.BG);
+
+        backdrop = new FrameLayout(this);
+        shelfArt = new FrameLayout(this);
+        ImageView back = Ui.fullImage(this), front = Ui.fullImage(this);
+        back.setId(R.id.wp_back);
+        front.setId(R.id.wp_front);
+        shelfArt.addView(back);
+        shelfArt.addView(front);
+        View fade = new View(this); // shelf melts into the background
+        fade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[] { 0x59090A0D, 0x00090A0D, 0xCC090A0D, 0xFF090A0D }));
+        shelfArt.addView(fade, new FrameLayout.LayoutParams(-1, -1));
+        backdrop.addView(shelfArt, new FrameLayout.LayoutParams(-1, Ui.dp(this, SHELF_TOP + 150)));
+        root.addView(backdrop, new FrameLayout.LayoutParams(-1, -1));
+
+        TextClock clock = new TextClock(this); // tvOS-style small clock, top right
+        clock.setFormat12Hour("h:mm");
+        clock.setFormat24Hour("H:mm");
+        Ui.style(clock, 20, 0.9f, false);
+        clock.setTextColor(Theme.TEXT);
+        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
+        clp.setMargins(0, Ui.dp(this, 30), Ui.dp(this, 56), 0);
+        root.addView(clock, clp);
+        greeting = new TextView(this); // kept for the shared greeting timer; not shown
+
+        LinearLayout title = new LinearLayout(this);
+        title.setOrientation(LinearLayout.VERTICAL);
+        heroSub = new TextView(this);
+        Ui.style(heroSub, 13, 1f, false);
+        heroSub.setTextColor(Theme.ACCENT);
+        heroSub.setAllCaps(true);
+        heroSub.setLetterSpacing(0.12f);
+        heroTitle = new TextView(this);
+        Ui.style(heroTitle, 44, 1f, false);
+        heroTitle.setTextColor(Theme.TEXT);
+        heroTitle.setSingleLine(true);
+        heroTitle.setEllipsize(TextUtils.TruncateAt.END);
+        title.addView(heroSub);
+        title.addView(heroTitle);
+        FrameLayout.LayoutParams tlp = new FrameLayout.LayoutParams(Ui.dp(this, 700), -2, Gravity.TOP | Gravity.START);
+        tlp.setMargins(Ui.dp(this, 64), Ui.dp(this, SHELF_TOP - 96), 0, 0);
+        shelfArt.addView(title, tlp);
+
+        shelfScroll = new ScrollView(this);
+        shelfScroll.setVerticalScrollBarEnabled(false);
+        shelfScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        shelfScroll.setFocusable(false);
+        shelfScroll.setClipToPadding(false);
+        int shelfFade = Ui.dp(this, 120);
+        shelfScroll.setOnScrollChangeListener((v, x, y, ox, oy) -> { // shelf fades and drifts up as you browse
+            shelfArt.setAlpha(Math.max(0f, 1f - y / (float) shelfFade));
+            shelfArt.setTranslationY(-y * 0.35f);
+        });
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        Ui.noClip(col);
+        col.setPadding(Ui.dp(this, 52), Ui.dp(this, SHELF_TOP), Ui.dp(this, 52), Ui.dp(this, 120));
+        dockRow = new LinearLayout(this);
+        dockRow.setOrientation(LinearLayout.HORIZONTAL);
+        Ui.noClip(dockRow);
+        col.addView(dockRow, new LinearLayout.LayoutParams(-2, -2));
+        grid = new GridLayout(this);
+        grid.setColumnCount(GRID_COLUMNS);
+        Ui.noClip(grid);
+        LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(-2, -2);
+        glp.topMargin = Ui.dp(this, 8);
+        col.addView(grid, glp);
+        shelfScroll.addView(col);
+        root.addView(shelfScroll, new FrameLayout.LayoutParams(-1, -1));
+
+        homeLayer = new FrameLayout(this);          // shared fields the other styles use
+        library = new FrameLayout(this);
+        library.setVisibility(View.GONE);
+        frost = new ImageView(this);
+        libraryCount = new TextView(this);
+        gridScroll = shelfScroll;
+        dockGlow = new View(this);
+        setContentView(root);
+    }
+
+    /** 16:10 rounded tile; name and a glossy sheen appear only on the focused tile (tvOS-like). */
+    private View shelfTile(App a, int dockIndex) {
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        Ui.noClip(cell);
+        FrameLayout t = artwork(a, SHELF_W, SHELF_H, 14);
+        View sheen = new View(this);
+        sheen.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[] { 0x40FFFFFF, 0x00FFFFFF, 0x00FFFFFF }));
+        sheen.setAlpha(0f);
+        t.addView(sheen, new FrameLayout.LayoutParams(-1, -1));
+        cell.addView(t, new LinearLayout.LayoutParams(Ui.dp(this, SHELF_W), Ui.dp(this, SHELF_H)));
+        TextView name = label(a.label, 13);
+        name.setGravity(Gravity.CENTER);
+        name.setAlpha(0f);
+        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(Ui.dp(this, SHELF_W), -2);
+        nlp.topMargin = Ui.dp(this, 12);
+        cell.addView(name, nlp);
+        makeFocusable(t, a, 1.14f, has -> {
+            name.animate().alpha(has ? 1f : 0f).setDuration(Theme.FOCUS_MS).start();
+            sheen.animate().alpha(has ? 1f : 0f).setDuration(Theme.FOCUS_MS).start();
+            if (!has) return;
+            heroTitle.setText(a.label);
+            heroSub.setText(a.category);
+            heroSub.setVisibility(a.category.isEmpty() ? View.INVISIBLE : View.VISIBLE);
+            if (dockIndex >= 0) { lastDockIndex = dockIndex; shelfScroll.smoothScrollTo(0, 0); }
+        });
+        int g = Ui.dp(this, 14);
+        if (dockIndex >= 0) {
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+            lp.setMargins(g, g, g, 0);
+            cell.setLayoutParams(lp);
+            return cell;
+        }
+        GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+        lp.setMargins(g, g, g, 0);
+        cell.setLayoutParams(lp);
+        return wrapForGrid(cell, t);
     }
 
     // ---------------------------------------------------------------- Actions

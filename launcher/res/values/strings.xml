@@ -42,4 +42,6 @@
         <item quantity="one">%d app</item>
         <item quantity="other">%d apps</item>
     </plurals>
+    <string name="settings_short">Settings</string>
+    <string name="style_shelf">Top Shelf</string>
 </resources>
