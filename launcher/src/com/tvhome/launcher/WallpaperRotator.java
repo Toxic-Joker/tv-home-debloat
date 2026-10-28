@@ -21,6 +21,9 @@ import java.util.concurrent.Executors;
 
 /** Crossfades between two stacked ImageViews using JPEGs from assets/wallpapers. */
 final class WallpaperRotator {
+    /** Gets a heavily blurred copy of each new wallpaper (for frosted overlays). */
+    interface BlurListener { void onBlurred(Bitmap blurred); }
+
     private static final String DIR = "wallpapers";
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
 
@@ -34,6 +37,9 @@ final class WallpaperRotator {
     private int index;
     private Bitmap shown;
     private boolean running;
+    private BlurListener blurListener;
+
+    void setBlurListener(BlurListener l) { blurListener = l; }
 
     private final Runnable tick = new Runnable() {
         @Override public void run() {
@@ -79,7 +85,18 @@ final class WallpaperRotator {
         IO.execute(() -> {
             Bitmap bmp = decode(file);
             if (bmp == null) return;
-            main.post(() -> show(bmp, captions.get(file)));
+            // Cheap "frosted glass": shrink to 64x36 and let bilinear upscaling blur it. Done once per wallpaper.
+            Bitmap blurred = null;
+            if (blurListener != null) {
+                Bitmap tiny = Bitmap.createScaledBitmap(bmp, 64, 36, true);
+                blurred = Bitmap.createScaledBitmap(tiny, 256, 144, true);
+                tiny.recycle();
+            }
+            final Bitmap frost = blurred;
+            main.post(() -> {
+                show(bmp, captions.get(file));
+                if (frost != null && blurListener != null) blurListener.onBlurred(frost);
+            });
         });
     }
 

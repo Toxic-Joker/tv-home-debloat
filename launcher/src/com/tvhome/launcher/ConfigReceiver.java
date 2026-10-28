@@ -23,6 +23,7 @@ public class ConfigReceiver extends BroadcastReceiver {
                     TextUtils.join(",", ctx.getResources().getStringArray(R.array.default_dock)));
         }
         if (i.hasExtra("keymap")) e.putString("keymap", i.getStringExtra("keymap"));
+        if (i.hasExtra("style")) e.putString("style", i.getStringExtra("style"));
         if (i.hasExtra("hidden")) e.putString("hidden", i.getStringExtra("hidden"));
         if (i.hasExtra("keep_adb_wifi")) e.putBoolean("keep_adb_wifi", i.getBooleanExtra("keep_adb_wifi", false));
         if (i.hasExtra("debug_keys")) e.putBoolean("debug_keys", i.getBooleanExtra("debug_keys", false));

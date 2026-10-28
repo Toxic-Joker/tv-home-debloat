@@ -21,7 +21,7 @@ import android.widget.TextView;
 
 /** Quick settings panel shown over the current app when Home is held. */
 public class QuickPanelActivity extends Activity {
-    private static final float PANEL_W = 448, TILE_W = 182, TILE_H = 70, RADIUS = 16;
+    private static final float PANEL_W = 448, TILE_W = 182, TILE_H = 70, RADIUS = 22;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -37,7 +37,8 @@ public class QuickPanelActivity extends Activity {
         int pad = Ui.dp(this, 28);
         panel.setPadding(pad, Ui.dp(this, 36), pad, pad);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xFF1C1D21);
+        bg.setColor(0xF7111317); // near-opaque so the app underneath doesn't show through
+        bg.setStroke(Math.max(1, Ui.dp(this, 1)), Theme.GLASS_EDGE);
         float r = Ui.dp(this, 28);
         bg.setCornerRadii(new float[] { r, r, 0, 0, 0, 0, r, r });
         panel.setBackground(bg);
@@ -84,6 +85,14 @@ public class QuickPanelActivity extends Activity {
                 HomeKeyService.instance.performGlobalAction(AccessibilityService.GLOBAL_ACTION_POWER_DIALOG);
             });
         }
+        // Home style switch (Cinema / Glass), for comparing the two looks
+        final boolean glassNow = Theme.STYLE_GLASS.equals(Theme.style(this));
+        add(grid, R.drawable.ic_picture, getString(R.string.style_label),
+                getString(glassNow ? R.string.style_glass : R.string.style_cinema), () -> {
+                    getSharedPreferences("home", MODE_PRIVATE).edit()
+                            .putString("style", glassNow ? Theme.STYLE_CINEMA : Theme.STYLE_GLASS).apply();
+                    finish();
+                });
         View all = add(grid, R.drawable.ic_settings, getString(R.string.all_settings), null,
                 () -> open(new Intent(Settings.ACTION_SETTINGS)));
         if (grid.getChildCount() % 2 == 1) { // last tile spans the row when the count is odd
@@ -141,7 +150,7 @@ public class QuickPanelActivity extends Activity {
         t.setFocusable(true);
         t.setClickable(true);
         final float r = Ui.dp(this, RADIUS);
-        t.setBackground(Ui.rounded(0x26FFFFFF, r));
+        t.setBackground(Theme.glass(this, RADIUS, 0x14FFFFFF));
 
         final ImageView iv = new ImageView(this);
         iv.setImageResource(icon);
@@ -170,7 +179,7 @@ public class QuickPanelActivity extends Activity {
         t.addView(text, tlp);
 
         t.setOnFocusChangeListener((v, has) -> {
-            v.setBackground(Ui.rounded(has ? 0xF2FFFFFF : 0x26FFFFFF, r));
+            v.setBackground(has ? Ui.rounded(0xF2F5F5F7, r) : Theme.glass(this, RADIUS, 0x14FFFFFF));
             int fg = has ? 0xFF111111 : 0xFFFFFFFF;
             name.setTextColor(fg);
             if (sub != null) sub.setTextColor(fg);

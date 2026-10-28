@@ -26,4 +26,20 @@
     <string name="settings_pill">⚙  Paramètres</string>
     <string name="gb_free">%.1f Go libres</string>
     <string name="picture">Image</string>
+    <string name="library_title">Applications</string>
+    <string name="library_hint">←  →  Naviguer   ·   OK  Ouvrir   ·   RETOUR  Accueil</string>
+    <string name="cat_video">Vidéo</string>
+    <string name="cat_audio">Musique et audio</string>
+    <string name="cat_game">Jeux</string>
+    <string name="cat_news">Actualités</string>
+    <string name="cat_image">Photos</string>
+    <string name="cat_social">Social</string>
+    <string name="cat_productivity">Productivité</string>
+    <string name="style_label">Style d\'accueil</string>
+    <string name="style_cinema">Cinéma</string>
+    <string name="style_glass">Verre</string>
+    <plurals name="app_count">
+        <item quantity="one">%d application</item>
+        <item quantity="other">%d applications</item>
+    </plurals>
 </resources>

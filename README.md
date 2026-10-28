@@ -38,6 +38,10 @@ Everything here is reversible: apps are only *disabled* (`pm disable-user`), nev
 - **Hold Home** anywhere (even inside an app) for the quick panel: Network, Display & sound, Storage,
   Apps, Screensaver, Power (sleep / restart) and All settings. Back closes it and returns to the app.
   It works through a small accessibility service ("TV Home quick panel") that only watches the Home key.
+- Two looks, switchable from the quick panel (**Home style** tile) or with
+  `--es style cinema|glass` on the CONFIGURE broadcast:
+  **Cinema** (wide artwork, big title of the focused app, colour glow) and **Glass**
+  (glossy rounded squares with a floor reflection, frosted app library).
 - English and French UI (follows the TV's language).
 - Wallpapers crossfade every 10 minutes (screensaver: every minute). Add or replace JPEGs in
   `launcher/assets/wallpapers/` (1920x1080) and add a caption line to `credits.txt`, then rebuild.

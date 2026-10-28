@@ -8,7 +8,7 @@ BT=$SDK/build-tools/36.0.0
 JAR=$SDK/platforms/android-34/android.jar
 JAVAC=${JAVAC:-javac}
 ADB=${ADB:-$ROOT/tools/platform-tools/adb}; [ -x "$ADB" ] || ADB=adb
-TV=${TV:-$(cat $ROOT/.tv 2>/dev/null)}
+TV=${TV:-$(head -1 $ROOT/.tv 2>/dev/null || true)}
 OUT=build
 
 rm -rf $OUT && mkdir -p $OUT/res $OUT/gen $OUT/classes $OUT/dex
