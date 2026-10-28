@@ -7,7 +7,7 @@ set -u
 [ -f "$BDIR/LATEST" ] || { echo "No backup for $DEVICE yet: run ./backup.sh first"; exit 1; }
 
 for p in "${PKGS[@]}"; do
-  if ! $A shell pm list packages -e "$p" | tr -d '\r' | grep -qx "package:$p"; then
+  if ! $A shell pm list packages -e --user 0 "$p" | tr -d '\r' | grep -qx "package:$p"; then
     echo "skip   $p (absent or already disabled)"; continue
   fi
   $A shell am force-stop "$p" >/dev/null 2>&1

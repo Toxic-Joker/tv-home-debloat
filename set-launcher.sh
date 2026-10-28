@@ -26,4 +26,4 @@ $A shell pm grant com.tvhome.launcher android.permission.WRITE_SECURE_SETTINGS
 # This TV's dock and button remaps (receiver only accepts ADB/shell, via the DUMP permission)
 $A shell am broadcast -a com.tvhome.launcher.CONFIGURE -n com.tvhome.launcher/.ConfigReceiver \
   --es dock "'$DOCK'" --es keymap "'$KEYMAP'" --es hidden "'$HIDDEN'" --ez keep_adb_wifi $KEEP | tail -1
-$A shell input keyevent KEYCODE_HOME
+[ "${NO_HOME:-0}" = 1 ] || $A shell input keyevent KEYCODE_HOME  # NO_HOME=1: don't interrupt what is playing

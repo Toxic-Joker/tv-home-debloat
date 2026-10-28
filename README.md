@@ -29,6 +29,7 @@ Everything here is reversible: apps are only *disabled* (`pm disable-user`), nev
 | `launcher/` | TV Home source (plain Java, no Gradle) + `build-and-install.sh` |
 | `set-launcher.sh` | Makes TV Home the Home button launcher and Nature Slideshow the screensaver, enables the key service and applies the profile's dock / remaps |
 | `free-space.sh` | Optional: rolls disabled apps back to their factory version (frees their downloaded updates) and clears the profile's `CLEAR_DATA` packages |
+| `maintain.sh` | Re-applies the debloat and TV Home only if something drifted (firmware update, re-enabled app, home reset); `--install-schedule` runs it every 2 hours from your computer |
 | `restore.sh` | Undo everything (`--remove-launcher` also uninstalls TV Home) |
 | `tools/setup.sh` | Fetches adb and the SDK build tools locally |
 
@@ -71,6 +72,16 @@ On the Mi TV Stick: YouTube → SmartTube, Prime Video → NetMirrorTV, Xiaomi T
 On the Continental Edison TV: YouTube → SmartTube, Gear → quick panel, Person → Accounts, ⋮⋮⋮ → All apps.
 Netflix, Prime Video, USB, TV, Input and the mic (Bluetooth pairing) stay with the TV's own services,
 so their apps (and `com.mediatek.*`, `com.google.android.tv.inputplayer`) are never disabled.
+
+## Updates
+Nothing here blocks updates. Firmware and security patches still come from Google Play services' system
+updater (Settings > System > About > System update, checked automatically), apps and Google Play system
+modules from the Play Store, and Xiaomi's update service stays enabled. A firmware update can re-enable
+apps or add new ones, so run `./maintain.sh` after one, or schedule it:
+```bash
+./maintain.sh --install-schedule   # crontab entry per TV in .tv, every 2 hours; logs to backup/<device>/maintain.log
+```
+It only reads the TV unless something changed, and never presses Home (playback isn't interrupted).
 
 ## Adding another TV
 1. `TV=<ip>:5555 ./backup.sh` (prints the device name, e.g. `[nagata]`).
