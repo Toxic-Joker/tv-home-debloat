@@ -5,10 +5,29 @@ Apple TV-style launcher. Profiles included for a Xiaomi Mi TV Stick 4K and a Con
 CDI Smart TV (MediaTek); other Google TVs need a profile of their own. Inspired by
 [mihirgupta0900/tv-home](https://github.com/mihirgupta0900/tv-home).
 
-| Before | After |
+| Stock Google TV | TV Home (Cinema) |
 |---|---|
-| ![Stock Google TV](docs/before-google-tv.png) | ![TV Home](docs/home.png) |
-| ![All apps](docs/all-apps.png) | ![Hold-Home quick panel](docs/quick-panel.png) |
+| ![Stock Google TV](docs/before-google-tv.png) | ![TV Home, Cinema style](docs/cinema-home.png) |
+
+## Home styles
+Three looks ship in the same app. Switch with the remote: hold **Home** → **Home style**
+(cycles Cinema → Glass → Top Shelf), or from a computer:
+`adb shell am broadcast -a com.tvhome.launcher.CONFIGURE -n com.tvhome.launcher/.ConfigReceiver --es style cinema|glass|shelf`.
+Every style keeps the same remote buttons, dock and long-press editing.
+
+| Style | Home | All apps |
+|---|---|---|
+| **Cinema** (default): glossy rounded-square logos, the focused app's name in large type, a glow in its colour | ![Cinema home](docs/cinema-home.png) | ![Cinema app library](docs/cinema-apps.png) |
+| **Glass**: centred glossy squares with a coloured floor reflection; frosted app library | ![Glass home](docs/glass-home.png) | ![Glass app library](docs/glass-apps.png) |
+| **Top Shelf** (Apple TV-like): the wallpaper as a full-width shelf over one grid, favourites first | ![Top Shelf home](docs/shelf-home.png) | ![Top Shelf scrolled into the grid](docs/shelf-apps.png) |
+
+Logos are cut out of each app's own TV banner (background cropped and keyed out) and placed on a
+two-tone glossy tile, all with plain drawables: no blur, video or network. All three use 130–140 MB
+while on screen on a 2 GB Mi TV Stick, and release ~40 MB of wallpaper bitmaps while another app is open.
+
+| Quick panel (hold Home) | Screensaver |
+|---|---|
+| ![Quick panel](docs/quick-panel.png) | ![Nature screensaver](docs/screensaver.png) |
 
 ## Setup
 ```bash
@@ -40,12 +59,7 @@ Everything here is reversible: apps are only *disabled* (`pm disable-user`), nev
 - **Hold Home** anywhere (even inside an app) for the quick panel: Network, Display & sound, Storage,
   Apps, Screensaver, Power (sleep / restart) and All settings. Back closes it and returns to the app.
   It works through a small accessibility service ("TV Home quick panel") that only watches the Home key.
-- Three looks, cycled from the quick panel (**Home style** tile) or set with
-  `--es style cinema|glass|shelf` on the CONFIGURE broadcast:
-  **Cinema** (default: glossy rounded-square logos, big title of the focused app, colour glow), **Glass**
-  (glossy rounded squares with the logo auto-cropped from the app's banner, floor reflection,
-  frosted app library) and **Top Shelf** (Apple TV-like: full-bleed wallpaper shelf over one grid,
-  favourites first, name shown only on the focused tile).
+- Three looks, see [Home styles](#home-styles).
 - The quick panel is a control centre: round quick actions (Wi-Fi, screensaver, power, settings)
   above pill controls (display & sound, storage with a usage bar, apps, home style).
 - While another app is open, TV Home releases its wallpaper bitmaps (about 40 MB on a Mi TV Stick).
